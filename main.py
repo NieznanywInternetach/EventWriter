@@ -121,7 +121,13 @@ class Application(tk.Tk):
                 }
                 self._index_simple = -1
                 self.row_number = -1  # just for now
-        
+                self.bind("<Expose>", self.on_expose)
+            
+            def on_expose(self, event):
+                """to solve an issue with not resizing after deletion of text fields"""
+                if not event.widget.children:
+                    event.widget.configure(height=1)
+            
             def add_field(self, idx_field):
                 if idx_field <= 2:
                     self._index_simple += 1
@@ -251,8 +257,6 @@ class Application(tk.Tk):
         self.widgets_cache: dict = {}
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
-        # events
-        self.tab_index = -1
         # database
         self.db_cursor = None
         self.db_connector = None
@@ -348,6 +352,9 @@ class Application(tk.Tk):
         if "event_event_notebook" not in self.widgets_cache.keys():
             event_event_notebook = self.EventNotebook(self.event_frame)
             event_frame_buttons = ttk.Frame(self.event_frame)
+            event_event_notebook.add_tab("test1")
+            event_event_notebook.add_tab("test2")
+            event_event_notebook.switch_event_button(0)
             self.widgets_cache["event_event_notebook"] = event_event_notebook
             self.widgets_cache["event_frame_buttons"] = event_frame_buttons
         else:
@@ -356,9 +363,6 @@ class Application(tk.Tk):
 
         event_event_notebook.grid(column=0, row=0, sticky=tk.N)
         event_frame_buttons.grid(column=1, row=0, padx=5)
-        event_event_notebook.add_tab("test1")
-        event_event_notebook.add_tab("test2")
-        event_event_notebook.switch_event_button(0)
         
         """
         if "event_frame_ws_buttons" not in self.widgets_cache.keys():
@@ -469,6 +473,11 @@ class Application(tk.Tk):
     
     # event mode funcs
     def add_event_elements(self):  # TODO make mandatory to add a title first etc
+        def update_and_add_field(idx):
+            nonlocal current_event_base
+            current_event_base = self.widgets_cache["event_event_notebook"].get_active_tab()
+            current_event_base.add_field(idx)
+        
         def add_buttons():
             nonlocal tab_flag
             if tab_flag:
@@ -515,7 +524,7 @@ class Application(tk.Tk):
             err_label = ttk.Label(main_frame, text=err_string)
             err_label.place(relheight=0.5, x=40, y=50)
             return
-        tab_button = ttk.Button(main_frame, text="Add a tab", width=20, command=add_buttons)
+        tab_button = ttk.Button(main_frame, text="Add an event", width=20, command=add_buttons)
         tab_button.grid(row=0, sticky=tk.EW)
 
         info_label = ttk.Label(main_frame, text="Name your event:")
@@ -526,17 +535,17 @@ class Application(tk.Tk):
         confirm_button = ttk.Button(main_frame, text="Add the event", command=add_xor_close)
         confirm_button["state"] = tk.DISABLED
         
-        title_button = ttk.Button(main_frame, text="Add title", command=lambda: current_event_base.add_field(0))
+        title_button = ttk.Button(main_frame, text="Add title", command=lambda: update_and_add_field(0))
         title_button.grid(row=4, sticky=tk.EW)
-        separator_button = ttk.Button(main_frame, text="Add separator", command=lambda: current_event_base.add_field(1))
+        separator_button = ttk.Button(main_frame, text="Add separator", command=lambda: update_and_add_field(1))
         separator_button.grid(row=5, sticky=tk.EW)
-        description_button = ttk.Button(main_frame, text="Add description", command=lambda: current_event_base.add_field(2))
+        description_button = ttk.Button(main_frame, text="Add description", command=lambda: update_and_add_field(2))
         description_button.grid(row=6, sticky=tk.EW)
-        embed_button_simple = ttk.Button(main_frame, text="Add simple field", command=lambda: current_event_base.add_field(3))
+        embed_button_simple = ttk.Button(main_frame, text="Add simple field", command=lambda: update_and_add_field(3))
         embed_button_simple.grid(row=7, sticky=tk.EW)
-        embed_button_stats = ttk.Button(main_frame, text="Add stats field", command=lambda: current_event_base.add_field(4))
+        embed_button_stats = ttk.Button(main_frame, text="Add stats field", command=lambda: update_and_add_field(4))
         embed_button_stats.grid(row=8, sticky=tk.EW)
-        embed_button_text = ttk.Button(main_frame, text="Add text field", command=lambda: current_event_base.add_field(5))
+        embed_button_text = ttk.Button(main_frame, text="Add text field", command=lambda: update_and_add_field(5))
         embed_button_text.grid(row=9, sticky=tk.EW)
         
     def delete_event_elements(self):
