@@ -1,13 +1,15 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, dnd
 from psycopg2 import connect
 from string import punctuation, digits, whitespace
 
 """
 ######################################
+todo: refactor names -> <class_name>_<type_name>_<info_if_needed>
+for indexes and data dicts
+
 bugs:
-modes -> event mode -> add -> text field
-after deletion the frame doesn't shrink back
+
 ######################################
 """
 
@@ -123,7 +125,8 @@ class Application(tk.Tk):
                 self.row_number = -1  # just for now
                 self.bind("<Expose>", self.on_expose)
             
-            def on_expose(self, event):
+            @staticmethod
+            def on_expose(event):
                 """to solve an issue with not resizing after deletion of text fields"""
                 if not event.widget.children:
                     event.widget.configure(height=1)
@@ -164,6 +167,7 @@ class Application(tk.Tk):
                     for field in temp_list:
                         if field.selected.get():
                             self.data_dict[field_type].remove(field)
+                root.enable_buttons(list(self.data_dict.values()))
         
             def recalculate_fields_position(self):
                 # ensures there's no empty rows
@@ -210,7 +214,7 @@ class Application(tk.Tk):
             """
             self.data_index += 1
             event_button = self.EventButton(self.data_index, master=self.buttons_frame, text=text,
-                                       command=lambda: self.switch_event_button(event_button.get_index()))
+                                            command=lambda: self.switch_event_button(event_button.get_index()))
             event_button.grid(row=0, column=self.data_index)
             event_handler = self.EventBase(self.events_frame)
             event_handler.columnconfigure((0, 1, 2), weight=1)
@@ -233,9 +237,12 @@ class Application(tk.Tk):
             if index != self.last_button_index:
                 if self.last_button_index != -1:
                     self.data[self.last_button_index].grid_remove()
+                    val_list = list(self.data[index].data_dict.values())
+                    root.disable_buttons(val_list)
+                    root.enable_buttons(val_list)
                 self.data[index].grid()
                 self.last_button_index = index
-    
+
     def __init__(self, *args, **kwargs):
         """
         For app general settings
@@ -254,9 +261,11 @@ class Application(tk.Tk):
         self.wm_minsize(width=400, height=400)
         self.option_add('*tearOff', False)
         self.app_root = self  # more meaningful name
-        self.widgets_cache: dict = {}
+        self.widgets_cache: dict = {}  # the main "storage" of the app
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
+        # events
+        self.field_button_refs = {}  # actually more cache than the widgets_cache
         # database
         self.db_cursor = None
         self.db_connector = None
@@ -477,7 +486,10 @@ class Application(tk.Tk):
             nonlocal current_event_base
             current_event_base = self.widgets_cache["event_event_notebook"].get_active_tab()
             current_event_base.add_field(idx)
-        
+            # blocking not proper field settings
+            fields_list = [len(x) for x in current_event_base.data_dict.values()]
+            root.disable_buttons(fields_list)
+            
         def add_buttons():
             nonlocal tab_flag
             if tab_flag:
@@ -506,6 +518,10 @@ class Application(tk.Tk):
             name_entry.grid_remove()
             confirm_button.grid_remove()
             tab_flag = False
+            
+        def exit_and_clear():
+            self.field_button_refs.clear()
+            new_toplevel.destroy()
 
         tab_flag = False
         err_string = ""
@@ -518,6 +534,7 @@ class Application(tk.Tk):
         new_toplevel = tk.Toplevel()
         new_toplevel.title(string="Add event fields")
         new_toplevel.resizable(False, False)
+        new_toplevel.bind("<Destroy>", lambda event: exit_and_clear())
         main_frame = ttk.Frame(new_toplevel, width=300, height=300)
         main_frame.grid()
         if err_string:
@@ -548,9 +565,38 @@ class Application(tk.Tk):
         embed_button_text = ttk.Button(main_frame, text="Add text field", command=lambda: update_and_add_field(5))
         embed_button_text.grid(row=9, sticky=tk.EW)
         
+        # todo independence from current event frame (bind destroy)
+        self.field_button_refs["title"] = title_button
+        self.field_button_refs["separator"] = separator_button
+        self.field_button_refs["desc"] = description_button
+        
     def delete_event_elements(self):
         """deletes all selected fields from active EventBase"""
         self.widgets_cache["event_event_notebook"].data[self.widgets_cache["event_event_notebook"].index()].delete_field()
+    
+    def enable_buttons(self, button_list):
+        if isinstance(button_list[3], int):
+            if button_list[3] + button_list[4] + button_list[5] > 0:
+                self.field_button_refs["title"]["state"] = tk.NORMAL
+                self.field_button_refs["separator"]["state"] = tk.NORMAL
+                self.field_button_refs["desc"]["state"] = tk.NORMAL
+        else:
+            if len(button_list[3] + button_list[4] + button_list[5]) == 0:
+                self.field_button_refs["title"]["state"] = tk.NORMAL
+                self.field_button_refs["separator"]["state"] = tk.NORMAL
+                self.field_button_refs["desc"]["state"] = tk.NORMAL
+    
+    def disable_buttons(self, button_list):
+        if isinstance(button_list[3], int):
+            if button_list[3] + button_list[4] + button_list[5] > 0:
+                self.field_button_refs["title"]["state"] = tk.DISABLED
+                self.field_button_refs["separator"]["state"] = tk.DISABLED
+                self.field_button_refs["desc"]["state"] = tk.DISABLED
+        else:
+            if len(button_list[3] + button_list[4] + button_list[5]) > 0:
+                self.field_button_refs["title"]["state"] = tk.DISABLED
+                self.field_button_refs["separator"]["state"] = tk.DISABLED
+                self.field_button_refs["desc"]["state"] = tk.DISABLED
     
     # database mode funcs
     def connect_db(self):
