@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, dnd
+from abc import ABC, abstractmethod
+from tkinter import ttk, filedialog
 from psycopg2 import connect
 from string import punctuation, digits, whitespace
 
@@ -7,7 +8,7 @@ from string import punctuation, digits, whitespace
 ######################################
 todo: refactor names -> <class_name>_<type_name>_<info_if_needed>
 for indexes and data dicts
-
+tkinter -> implement dnd
 bugs:
 
 ######################################
@@ -15,234 +16,6 @@ bugs:
 
 
 class Application(tk.Tk):
-    
-    class EventNotebook(ttk.Frame):
-    
-        class EventBase(ttk.Frame):
-        
-            class EventField(ttk.Labelframe):
-                def __init__(self, instance_idx, master=None, **kwargs):
-                    super().__init__(master, **kwargs)
-                    self.instance_idx = instance_idx
-                    self.chosen_field = ""
-                    self.selected = tk.BooleanVar(master=self, value=False)
-                    self.inline = tk.BooleanVar(master=self, value=False)  # if relevant
-                    self.text = tk.StringVar(master=self)  # master=self so it gets deleted with widget
-            
-                def add_title(self):
-                    self.chosen_field = "title"
-                    if self.instance_idx == 0:
-                        self.config(text="Event Title")
-                    else:
-                        self.config(text="Text Title")
-                    text_entry = ttk.Entry(self, textvariable=self.text)
-                    text_entry.grid(column=0, row=0)
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0)
-            
-                def add_separator(self):
-                    def verify():
-                        if len(self.text.get()) > 1:
-                            self.text.set(self.text.get()[:1])
-                
-                    self.chosen_field = "separator"
-                    self.config(text="Separator")
-                    text_entry = ttk.Entry(self, textvariable=self.text)
-                    text_entry.grid(column=0, row=0)
-                    self.text.trace_add("write", lambda name, idx_, mode: verify())
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0)
-            
-                def add_description(self):  # TODO add verify
-                    def update_text():
-                        self.text.set(text_text.get("1.0", "end-1c"))
-                
-                    self.chosen_field = "desc"
-                    self.config(text="Description")
-                    text_text = tk.Text(self, width=40, height=5, wrap="word")
-                    text_text.grid(column=0, row=0)
-                    text_text.bind("<<Modified>>", lambda e: update_text())
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0)
-                    print(text_text)
-            
-                def add_embed(self):
-                    self.chosen_field = "embed"
-                    self.config(text="Simple Embed")
-                    text_entry = ttk.Entry(self, textvariable=self.text)
-                    text_entry.grid(column=0, row=0)
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0)
-                    inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
-                                                   offvalue=False)
-                    inline_check.grid(column=2, row=0)
-            
-                def add_embed_stats(self):
-                    self.chosen_field = "embed_stats"
-                    self.config(text="Embed Stats")
-                    text_entry = ttk.Entry(self, textvariable=self.text)
-                    text_entry.grid(column=0, row=0)
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0)
-                    inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
-                                                   offvalue=False)
-                    inline_check.grid(column=2, row=0)
-            
-                def add_embed_text(self):
-                    def update_text():
-                        self.text.set(text_text.get("1.0", "end-1c"))
-                
-                    self.chosen_field = "embed_text"
-                    self.config(text="Embed Text")
-                    text_text = tk.Text(self, width=40, height=5, wrap="word")
-                    text_text.grid(column=0, row=0, rowspan=2)
-                    text_text.bind("<<Modified>>", lambda e: update_text())
-                    select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
-                                                   offvalue=False)
-                    select_check.grid(column=1, row=0, sticky=tk.N, pady=5)
-                    inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
-                                                   offvalue=False)
-                    inline_check.grid(column=1, row=1)
-        
-            def __init__(self, master=None, **kwargs):
-                super().__init__(master, **kwargs)
-                # 0 - titles, 1 - separator, 2 - description text || pre-init of Embed
-                # 3 - embed field ("name":value), 4 - stats embed field ("name":60/100), 5 - descriptions embeds || post-init of Embed
-                self.data_dict = {  # lists of EventFields
-                    "title"      : [],
-                    "separator"  : [],
-                    "desc"       : [],
-                    "embed"      : [],
-                    "embed_stats": [],
-                    "embed_text" : []
-                }
-                self._index_simple = -1
-                self.row_number = -1  # just for now
-                self.bind("<Expose>", self.on_expose)
-            
-            @staticmethod
-            def on_expose(event):
-                """to solve an issue with not resizing after deletion of text fields"""
-                if not event.widget.children:
-                    event.widget.configure(height=1)
-            
-            def add_field(self, idx_field):
-                if idx_field <= 2:
-                    self._index_simple += 1
-                self.row_number += 1
-                event_field = self.EventField(self._index_simple, self)
-                event_field.grid(column=1, row=self.row_number)
-                self.rowconfigure(self.row_number, weight=1)
-                self.columnconfigure(1, weight=1)
-                if idx_field == 0:
-                    event_field.add_title()
-                    self.data_dict["title"].append(event_field)
-                elif idx_field == 1:
-                    event_field.add_separator()
-                    self.data_dict["separator"].append(event_field)
-                elif idx_field == 2:
-                    event_field.add_description()
-                    self.data_dict["desc"].append(event_field)
-                elif idx_field == 3:
-                    event_field.add_embed()
-                    self.data_dict["embed"].append(event_field)
-                elif idx_field == 4:
-                    event_field.add_embed_stats()
-                    self.data_dict["embed_stats"].append(event_field)
-                elif idx_field == 5:
-                    event_field.add_embed_text()
-                    self.data_dict["embed_text"].append(event_field)
-        
-            def delete_field(self):
-                for field_type in self.data_dict.keys():
-                    temp_list = self.data_dict[field_type]  # temp list so there's no issue when deleting the elements
-                    for field in temp_list:
-                        if field.selected.get():
-                            field.destroy()
-                    for field in temp_list:
-                        if field.selected.get():
-                            self.data_dict[field_type].remove(field)
-                root.enable_buttons(list(self.data_dict.values()))
-        
-            def recalculate_fields_position(self):
-                # ensures there's no empty rows
-                pass
-        
-            def verify_field(self):
-                for field_type in self.data_dict.keys():
-                    if self.data_dict[field_type]:  # doesn't bother to check empty lists
-                        temp_list = self.data_dict[field_type]
-                        for idx, field in enumerate(temp_list):  # looking through the elements of a list
-                            if field.selected.get():
-                                pass
-
-        class EventButton(ttk.Button):
-            def __init__(self, index, master=None, **kwargs):
-                super().__init__(master, **kwargs)
-                self.index = index
-    
-            def set_index(self, value):
-                self.index = value
-    
-            def get_index(self):
-                return self.index
-        
-        def __init__(self, master=None, **kwargs):
-            super().__init__(master, **kwargs)
-            self.data = {}
-            self.data_index = -1
-            self.last_button_index = -1
-            self.rowconfigure(0, weight=1)
-            self.columnconfigure(0, weight=1)
-            self.buttons_frame = ttk.Frame(self, width=200, height=20)
-            self.buttons_frame.grid(column=0, row=0, sticky=tk.N)
-            self.events_frame = ttk.Frame(self, width=200, height=200)  # hmm
-            self.events_frame.grid(column=0, row=1)
-        
-        def add_tab(self, text):
-            """
-            EventButton( ..., command=...) is a hacky part which works because
-            the value of command isn't evaluated till the button is clicked
-            so can get it assigned before the value exist.  But it is necessary,
-            otherwise all buttons would refer to the EventBase of index == self.data_index
-            instead of the index when they were created
-            """
-            self.data_index += 1
-            event_button = self.EventButton(self.data_index, master=self.buttons_frame, text=text,
-                                            command=lambda: self.switch_event_button(event_button.get_index()))
-            event_button.grid(row=0, column=self.data_index)
-            event_handler = self.EventBase(self.events_frame)
-            event_handler.columnconfigure((0, 1, 2), weight=1)
-            self.data[self.data_index] = event_handler
-        
-        def remove_tab(self, idx):
-            self.data_index -= 1
-            pass
-        
-        def get_active_tab(self):
-            return self.data[self.last_button_index]
-        
-        def index(self, set_to: int = -1):
-            if set_to != -1:
-                self.last_button_index = set_to
-            else:
-                return self.last_button_index
-        
-        def switch_event_button(self, index):
-            if index != self.last_button_index:
-                if self.last_button_index != -1:
-                    self.data[self.last_button_index].grid_remove()
-                    val_list = list(self.data[index].data_dict.values())
-                    root.disable_buttons(val_list)
-                    root.enable_buttons(val_list)
-                self.data[index].grid()
-                self.last_button_index = index
-
     def __init__(self, *args, **kwargs):
         """
         For app general settings
@@ -325,11 +98,11 @@ class Application(tk.Tk):
         data = "get data from the localisation"
         self.loaded_recently = data
         # and stuff
-    """
+    
     def autosave(self):
         # save data to the localisation
         pass
-    
+    """
     # the basis for GUI
     def switch_mode(self, mode_id):
         if self.widgets_cache["previous_frame_id"] == 0:
@@ -340,6 +113,8 @@ class Application(tk.Tk):
             self.event_frame.grid_forget()
         elif self.widgets_cache["previous_frame_id"] == 2:
             self.database_frame.grid_forget()
+        elif self.widgets_cache["previous_frame_id"] == -1:
+            print("EvenWriter started")
         else:
             print("Error switch_mode: previous_frame_id {} todo".format(self.widgets_cache["previous_frame_id"]))
         if mode_id == 1:
@@ -359,7 +134,7 @@ class Application(tk.Tk):
         self.event_frame.columnconfigure(0, weight=1)
         # arbitrary key, little need for checking the second element
         if "event_event_notebook" not in self.widgets_cache.keys():
-            event_event_notebook = self.EventNotebook(self.event_frame)
+            event_event_notebook = EventNotebook(self.event_frame)
             event_frame_buttons = ttk.Frame(self.event_frame)
             event_event_notebook.add_tab("test1")
             event_event_notebook.add_tab("test2")
@@ -372,25 +147,6 @@ class Application(tk.Tk):
 
         event_event_notebook.grid(column=0, row=0, sticky=tk.N)
         event_frame_buttons.grid(column=1, row=0, padx=5)
-        
-        """
-        if "event_frame_ws_buttons" not in self.widgets_cache.keys():
-            event_frame_ws_buttons = ttk.Frame(event_event_notebook, width=200, height=20)
-            event_frame_ws_events = ttk.Frame(event_event_notebook, width=200, height=200)
-            self.widgets_cache["event_frame_ws_buttons"] = event_frame_ws_buttons
-            self.widgets_cache["event_frame_ws_events"] = event_frame_ws_events
-            # place for placeholders / initial tab
-            self.add_notebook_tab("test1")
-            self.add_notebook_tab("test2")
-        else:
-            event_frame_ws_buttons = self.widgets_cache["event_frame_ws_buttons"]
-            event_frame_ws_events = self.widgets_cache["event_frame_ws_events"]
-
-        event_frame_ws_buttons.grid(column=0, row=0, sticky=tk.N)
-        event_frame_ws_events.grid(column=0, row=1, sticky=tk.NSEW)
-        # add opened notebook tabs
-        print(self.widgets_cache["event_frame_ws_events"])
-        """
         
         if "event_button_add" not in self.widgets_cache.keys():
             event_button_add = ttk.Button(event_frame_buttons, text="Add...", command=self.add_event_elements)
@@ -489,7 +245,8 @@ class Application(tk.Tk):
             # blocking not proper field settings
             fields_list = [len(x) for x in current_event_base.data_dict.values()]
             root.disable_buttons(fields_list)
-            
+            # todo replace root...._buttons, buttons should listen to data_dict
+
         def add_buttons():
             nonlocal tab_flag
             if tab_flag:
@@ -523,7 +280,7 @@ class Application(tk.Tk):
             self.field_button_refs.clear()
             new_toplevel.destroy()
 
-        tab_flag = False
+        tab_flag = False  # to check if the add tab submenu is open or not
         err_string = ""
         try:
             current_event_base = self.widgets_cache["event_event_notebook"].get_active_tab()
@@ -573,30 +330,6 @@ class Application(tk.Tk):
     def delete_event_elements(self):
         """deletes all selected fields from active EventBase"""
         self.widgets_cache["event_event_notebook"].data[self.widgets_cache["event_event_notebook"].index()].delete_field()
-    
-    def enable_buttons(self, button_list):
-        if isinstance(button_list[3], int):
-            if button_list[3] + button_list[4] + button_list[5] > 0:
-                self.field_button_refs["title"]["state"] = tk.NORMAL
-                self.field_button_refs["separator"]["state"] = tk.NORMAL
-                self.field_button_refs["desc"]["state"] = tk.NORMAL
-        else:
-            if len(button_list[3] + button_list[4] + button_list[5]) == 0:
-                self.field_button_refs["title"]["state"] = tk.NORMAL
-                self.field_button_refs["separator"]["state"] = tk.NORMAL
-                self.field_button_refs["desc"]["state"] = tk.NORMAL
-    
-    def disable_buttons(self, button_list):
-        if isinstance(button_list[3], int):
-            if button_list[3] + button_list[4] + button_list[5] > 0:
-                self.field_button_refs["title"]["state"] = tk.DISABLED
-                self.field_button_refs["separator"]["state"] = tk.DISABLED
-                self.field_button_refs["desc"]["state"] = tk.DISABLED
-        else:
-            if len(button_list[3] + button_list[4] + button_list[5]) > 0:
-                self.field_button_refs["title"]["state"] = tk.DISABLED
-                self.field_button_refs["separator"]["state"] = tk.DISABLED
-                self.field_button_refs["desc"]["state"] = tk.DISABLED
     
     # database mode funcs
     def connect_db(self):
@@ -741,6 +474,8 @@ class Application(tk.Tk):
             tags = tags_tree.selection()
             if tags:
                 tags_tree.delete(*tags)
+                # creates an sql request that deletes any given number of tags, [:-1]+")" is to replace the last comma
+                # "DELETE FROM tags_list WHERE tag IN ('tag1', 'tag2')"
                 self.db_cursor.execute("".join([self.db_string_delete_tags, "(", *[f"'{tag}'," for tag in tags]])[:-1]+")")
                 self.db_connector.commit()
                 self.db_set_tags.difference(tags)
@@ -828,6 +563,363 @@ class Application(tk.Tk):
         else:
             if debug_label_svar:
                 debug_label_svar.set(self.info_string_tags+self.error_string_tags)
+
+
+class EventNotebook(ttk.Frame):
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.data = ObservableDict()
+        self.data_index = ObservableInt(-1)
+        self.last_button_index = ObservableInt(-1)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.buttons_frame = ttk.Frame(self, width=200, height=20)
+        self.buttons_frame.grid(column=0, row=0, sticky=tk.N)
+        self.events_frame = ttk.Frame(self, width=200, height=200)  # hmm
+        self.events_frame.grid(column=0, row=1)
+
+    @property
+    def last_index(self):
+        return self.last_button_index.value
+
+    @last_index.setter
+    def last_index(self, new_value):
+        self.last_button_index.value = new_value
+
+    def add_tab(self, text):
+        """
+        EventButton( ..., command=...) is a hacky part which works because
+        the value of command isn't evaluated till the button is clicked
+        so can get it assigned before the value exist.  But it is necessary,
+        otherwise all buttons would refer to the EventBase of index == self.data_index
+        instead of the index when they were created
+        """
+        self.data_index += 1
+        event_button = EventButton(self.data_index, master=self.buttons_frame, text=text,
+                                   command=lambda: self.switch_event_button(event_button.get_index()))
+        event_button.grid(row=0, column=self.data_index)
+        event_handler = EventBase(self.events_frame)
+        event_handler.columnconfigure((0, 1, 2), weight=1)
+        self.data[self.data_index] = event_handler
+
+    def remove_tab(self, idx):
+        self.data_index -= 1
+        pass
+
+    def get_active_tab(self):
+        return self.data[self.last_index]
+
+    def index(self, set_to: int = -1):
+        if set_to != -1:
+            self.last_index = set_to
+        else:
+            return self.last_index
+
+    def switch_event_button(self, index):
+        if index != self.last_index:
+            # if index changed - change the "tab"
+            if self.last_button_index != -1:
+                # -1 is an indicator of the first run, when the EventBase frames don't exist yet
+                self.data[self.last_index].grid_remove()
+                val_list = list(self.data[index].data_dict.values())
+                # todo replace root...._buttons
+                root.disable_buttons(val_list)
+                root.enable_buttons(val_list)
+            self.data[index].grid()
+            self.last_index = index
+
+
+class EventBase(ttk.Frame):
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        # 0 - titles, 1 - separator, 2 - description text || pre-init of Embed
+        # 3 - embed field ("name":value), 4 - stats embed field ("name":60/100), 5 - descriptions embeds || post-init of Embed
+        self.data_dict = ObservableDict({  # lists of EventFields
+            "title": [],
+            "separator": [],
+            "desc": [],
+            "embed": [],
+            "embed_stats": [],
+            "embed_text": []
+        })
+        self._index_simple = -1
+        self.row_number = -1  # just for now
+        self.bind("<Expose>", self.on_expose)
+
+    @staticmethod
+    def on_expose(event):
+        """to solve an issue about not resizing after deletion of text fields"""
+        if not event.widget.children:
+            event.widget.configure(height=1)
+
+    def add_field(self, idx_field):
+        if idx_field <= 2:
+            self._index_simple += 1
+        self.row_number += 1
+        event_field = EventField(self._index_simple, self)
+        event_field.grid(column=1, row=self.row_number)
+        self.rowconfigure(self.row_number, weight=1)
+        self.columnconfigure(1, weight=1)
+        if idx_field == 0:
+            event_field.add_title()
+            self.data_dict["title"].append(event_field)
+        elif idx_field == 1:
+            event_field.add_separator()
+            self.data_dict["separator"].append(event_field)
+        elif idx_field == 2:
+            event_field.add_description()
+            self.data_dict["desc"].append(event_field)
+        elif idx_field == 3:
+            event_field.add_embed()
+            self.data_dict["embed"].append(event_field)
+        elif idx_field == 4:
+            event_field.add_embed_stats()
+            self.data_dict["embed_stats"].append(event_field)
+        elif idx_field == 5:
+            event_field.add_embed_text()
+            self.data_dict["embed_text"].append(event_field)
+
+    def delete_field(self):
+        for field_type in self.data_dict.keys():
+            temp_list = self.data_dict[field_type]  # temp list so there's no issue when deleting the elements
+            for field in temp_list:
+                if field.selected.get():
+                    field.destroy()
+            for field in temp_list:
+                if field.selected.get():
+                    self.data_dict[field_type].remove(field)
+        # todo replace root...._buttons
+        root.enable_buttons(list(self.data_dict.values()))
+
+    def recalculate_fields_position(self):
+        # ensures there's no empty rows
+        pass
+
+    def verify_field(self):
+        for field_type in self.data_dict.keys():
+            if self.data_dict[field_type]:  # doesn't bother to check empty lists
+                temp_list = self.data_dict[field_type]
+                for idx, field in enumerate(temp_list):  # looking through the elements of a list
+                    if field.selected.get():
+                        pass
+
+
+class EventField(ttk.Labelframe):
+    def __init__(self, instance_idx, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.instance_idx = instance_idx
+        self.chosen_field = ""
+        self.selected = tk.BooleanVar(master=self, value=False)
+        self.inline = tk.BooleanVar(master=self, value=False)  # if relevant
+        self.text = tk.StringVar(master=self)  # master=self so it gets deleted with widget
+
+    def add_title(self):
+        self.chosen_field = "title"
+        if self.instance_idx == 0:
+            self.config(text="Event Title")
+        else:
+            self.config(text="Text Title")
+        text_entry = ttk.Entry(self, textvariable=self.text)
+        text_entry.grid(column=0, row=0)
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0)
+
+    def add_separator(self):
+        def verify():
+            if len(self.text.get()) > 1:
+                self.text.set(self.text.get()[:1])
+
+        self.chosen_field = "separator"
+        self.config(text="Separator")
+        text_entry = ttk.Entry(self, textvariable=self.text)
+        text_entry.grid(column=0, row=0)
+        self.text.trace_add("write", lambda name, idx_, mode: verify())
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0)
+
+    def add_description(self):  # TODO add verify
+        def update_text():
+            self.text.set(text_text.get("1.0", "end-1c"))
+
+        self.chosen_field = "desc"
+        self.config(text="Description")
+        text_text = tk.Text(self, width=40, height=5, wrap="word")
+        text_text.grid(column=0, row=0)
+        text_text.bind("<<Modified>>", lambda e: update_text())
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0)
+        print(text_text)
+
+    def add_embed(self):
+        self.chosen_field = "embed"
+        self.config(text="Simple Embed")
+        text_entry = ttk.Entry(self, textvariable=self.text)
+        text_entry.grid(column=0, row=0)
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0)
+        inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
+                                       offvalue=False)
+        inline_check.grid(column=2, row=0)
+
+    def add_embed_stats(self):
+        self.chosen_field = "embed_stats"
+        self.config(text="Embed Stats")
+        text_entry = ttk.Entry(self, textvariable=self.text)
+        text_entry.grid(column=0, row=0)
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0)
+        inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
+                                       offvalue=False)
+        inline_check.grid(column=2, row=0)
+
+    def add_embed_text(self):
+        def update_text():
+            self.text.set(text_text.get("1.0", "end-1c"))
+
+        self.chosen_field = "embed_text"
+        self.config(text="Embed Text")
+        text_text = tk.Text(self, width=40, height=5, wrap="word")
+        text_text.grid(column=0, row=0, rowspan=2)
+        text_text.bind("<<Modified>>", lambda e: update_text())
+        select_check = ttk.Checkbutton(self, text="select", variable=self.selected, onvalue=True,
+                                       offvalue=False)
+        select_check.grid(column=1, row=0, sticky=tk.N, pady=5)
+        inline_check = ttk.Checkbutton(self, text="inline", variable=self.inline, onvalue=True,
+                                       offvalue=False)
+        inline_check.grid(column=1, row=1)
+
+
+class EventButton(ttk.Button):
+    def __init__(self, index, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.index = index
+
+    def set_index(self, value):
+        self.index = value
+
+    def get_index(self):
+        return self.index
+
+
+class EventButtonLogic:
+    # todo rework
+    def __init__(self, event_base, buttons_count_dict):
+        self._observer: EventBase = event_base
+        self._buttons_cd = buttons_count_dict
+
+    def enable_buttons(self, button_list):
+        if isinstance(button_list[3], int):
+            if button_list[3] + button_list[4] + button_list[5] > 0:
+                self._observer["title"]["state"] = tk.NORMAL
+                self._observer["separator"]["state"] = tk.NORMAL
+                self._observer["desc"]["state"] = tk.NORMAL
+        else:
+            if len(button_list[3] + button_list[4] + button_list[5]) == 0:
+                self._observer["title"]["state"] = tk.NORMAL
+                self._observer["separator"]["state"] = tk.NORMAL
+                self._observer["desc"]["state"] = tk.NORMAL
+
+    def disable_buttons(self, button_list):
+        if isinstance(button_list[3], int):
+            if button_list[3] + button_list[4] + button_list[5] > 0:
+                self._observer["title"]["state"] = tk.DISABLED
+                self._observer["separator"]["state"] = tk.DISABLED
+                self._observer["desc"]["state"] = tk.DISABLED
+        else:
+            if len(button_list[3] + button_list[4] + button_list[5]) > 0:
+                self._observer["title"]["state"] = tk.DISABLED
+                self._observer["separator"]["state"] = tk.DISABLED
+                self._observer["desc"]["state"] = tk.DISABLED
+
+
+class Observable(ABC):
+    def __init__(self):
+        self._observers = []
+
+    def add_observer(self, observer):
+        self._observers.append(observer)
+
+    def delete_observer(self, observer):
+        self._observers.remove(observer)
+
+    def get_observers(self):
+        return self._observers
+
+    @abstractmethod
+    def notify(self, *args):
+        """to implement conditions when observers gets notified
+        if ...:
+            for observer in self._observers:
+                observer.notified()"""
+        pass
+
+
+class Observer(ABC):
+    @abstractmethod
+    def notified(self, *args):
+        """what to do when you get notified"""
+        pass
+
+
+class ObservableDict(dict, Observable):
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.notify("ObsDict_setitem", key, value)
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        self.notify("ObsDict_delitem", key)
+
+    def notify(self, *args):
+        for observer in self.get_observers():
+            observer.notified(*args)
+
+
+class ObservableInt(Observable):
+    """
+    Warning - don't use plain assignment because it overwrites the class
+    use <obj>.value instead, eg.
+    my_special_int.value = 10
+    everything else should be fine
+    """
+    def __init__(self, value):
+        super().__init__()
+        print("init value: ", value)
+        self._value = value
+
+    def notify(self, *args):
+        for observer in self.get_observers():
+            observer.notified(*args)
+
+    @property
+    def value(self):
+        print("simple value: ", self._value)
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        print("setter - new value: ", new_value)
+        self._value = new_value
+        self.notify("ObsInt_setter", new_value)
+
+    def __add__(self, other):
+        return self.value + other
+
+    def __iadd__(self, other):
+        self.value = self.value + other
+        return self
+
+    def __sub__(self, other):
+        return self.value - other
+
+    def __isub__(self, other):
+        self.value = self.value - other
+        return self
 
 
 if __name__ == "__main__":
