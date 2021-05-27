@@ -10,3 +10,5 @@ EventWriter is a tool meant to improve productivity for Project Sigma developmen
 > Proper diplomatic interactions and military interventions are also planned.
 
 Developer uses it to create a structure of event, which later will be processed by the bot and displayed to user.
+It should be remembered that EventWriter is WIP, and much of its functionality is yet to be implemented.
+It gives some insight into code practises of the programmer though.
