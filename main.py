@@ -568,6 +568,9 @@ class Application(tk.Tk):
 class EventNotebook(ttk.Frame):
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
+
+
+
         self.data = ObservableDict()
         self.data_index = ObservableInt(-1)
         self.last_button_index = ObservableInt(-1)
@@ -618,8 +621,8 @@ class EventNotebook(ttk.Frame):
     def switch_event_button(self, index):
         if index != self.last_index:
             # if index changed - change the "tab"
-            if self.last_button_index != -1:
-                # -1 is an indicator of the first run, when the EventBase frames don't exist yet
+            if self.last_index != -1:
+                # -1 is an indicator of the first run, when the EventBase frames doesn't exist yet
                 self.data[self.last_index].grid_remove()
                 val_list = list(self.data[index].data_dict.values())
                 # todo replace root...._buttons
@@ -880,7 +883,7 @@ class ObservableDict(dict, Observable):
             observer.notified(*args)
 
 
-class ObservableInt(Observable):
+class ObservableInt(Observable, int):
     """
     Warning - don't use plain assignment because it overwrites the class
     use <obj>.value instead, eg.
