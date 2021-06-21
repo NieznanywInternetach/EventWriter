@@ -14,6 +14,8 @@ It should be remembered that EventWriter is WIP, and much of its functionality i
 
 It gives some insight into code practises of the programmer though.
 
+
+
 You may find interesting my other project, written in C, for passing one of the minors (Structural Programming) in college:
 https://github.com/NieznanywInternetach/symulator_pomiarowy
 
