@@ -1,7 +1,6 @@
 # EventWriter
 All right reserved unless otherwise specified. Processing allowed for recruitment purposes.
-
-# NOTE: This implementation of EventWriter is being rewritten using Kivy instead of Tkinter
+NOTE: This implementation of EventWriter is being rewritten using Kivy instead of Tkinter
 
 EventWriter is a tool meant to improve productivity for Project Sigma development.
 
